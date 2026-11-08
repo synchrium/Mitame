@@ -1,0 +1,4 @@
+# GitHub の言語の集計から、hidpi-mirror（pasky、MIT）をもとにした Objective-C の部分を外す
+# （アプリ本体は Swift。外さないと、いちばん大きいこのファイルで「Objective-C」と表示される）
+Mitame/Engine/** linguist-vendored
+Mitame/Mitame-Bridging-Header.h linguist-vendored
