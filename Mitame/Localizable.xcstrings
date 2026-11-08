@@ -1,0 +1,179 @@
+{
+  "sourceLanguage": "ja",
+  "strings": {
+    "%@": {
+      "shouldTranslate": false
+    },
+    "%@（%u × %u）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (%2$u × %3$u)"
+          }
+        }
+      }
+    },
+    "%@（モニターと同じ）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (Same as Monitor)"
+          }
+        }
+      }
+    },
+    "%@：%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: %2$@"
+          }
+        }
+      }
+    },
+    "%@：もとから HiDPI です": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: Already HiDPI"
+          }
+        }
+      }
+    },
+    "%@：オフ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: Off"
+          }
+        }
+      }
+    },
+    "%@：準備中…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@: Getting ready…"
+          }
+        }
+      }
+    },
+    "HiDPI にする": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HiDPI"
+          }
+        }
+      }
+    },
+    "Mitame について": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About Mitame"
+          }
+        }
+      }
+    },
+    "モニター": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monitor"
+          }
+        }
+      }
+    },
+    "モニターをつなぐと HiDPI になります": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect a monitor to turn on HiDPI"
+          }
+        }
+      }
+    },
+    "ログイン時に起動": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open at Login"
+          }
+        }
+      }
+    },
+    "作り直す": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rebuild"
+          }
+        }
+      }
+    },
+    "外部モニター": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "External Monitor"
+          }
+        }
+      }
+    },
+    "外部モニターが見つかりません": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No external monitor found"
+          }
+        }
+      }
+    },
+    "外部モニターを HiDPI（Retina）で表示します。\n\nhidpi-mirror（Petr Baudis、MIT License）の処理を使っています。\nhttps://github.com/pasky/hidpi-mirror": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows your external monitor in HiDPI (Retina).\n\nBased on hidpi-mirror by Petr Baudis (MIT License).\nhttps://github.com/pasky/hidpi-mirror"
+          }
+        }
+      }
+    },
+    "終了": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit Mitame"
+          }
+        }
+      }
+    },
+    "見た目の大きさ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looks Like"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
