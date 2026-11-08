@@ -60,7 +60,7 @@ Mitame は、それをメニューバーのアプリにしたものです。
 
 ## 入れ方
 
-1. [最新のリリース](https://github.com/synchrium/Mitame/releases/latest) から `Mitame-x.y.zip` をダウンロードします。
+1. [リリースのページ](https://github.com/synchrium/Mitame/releases) から `Mitame-x.y.zip` をダウンロードします（一番上が最新です）。
 2. zip をダブルクリックして、`Mitame.app` を取り出します。
 3. **Finder で `Mitame.app` を「アプリケーション」フォルダへドラッグします。**
    （Finder で移してください。移さずに開くと、macOS は一時的な場所から動かします）

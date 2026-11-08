@@ -60,7 +60,7 @@ If you try one of these, please [let us know](https://github.com/synchrium/Mitam
 
 ## Install
 
-1. Download `Mitame-x.y.zip` from the [latest release](https://github.com/synchrium/Mitame/releases/latest).
+1. Download `Mitame-x.y.zip` from the [Releases page](https://github.com/synchrium/Mitame/releases) (the newest one is at the top).
 2. Double-click the zip file to extract `Mitame.app`.
 3. **Drag `Mitame.app` to the Applications folder in the Finder.**
    (Please move it with the Finder. If you open it without moving it, macOS runs it from a temporary location.)
