@@ -67,7 +67,7 @@ Mitame は、それをメニューバーのアプリにしたものです。
 まだ確かめていないもの：macOS 14〜26、Intel の Mac、14 インチ以上の MacBook の内蔵ディスプレイ、WQHD・16:10・ウルトラワイドのモニター、2 台以上のモニター、DisplayLink のアダプター。
 試した方は [教えてください](https://github.com/synchrium/Mitame/issues)。
 
-## 入れ方
+## インストール方法
 
 1. [リリースのページ](https://github.com/synchrium/Mitame/releases) から `Mitame-x.y.zip` をダウンロードします（一番上が最新です）。
 2. zip をダブルクリックして、`Mitame.app` を取り出します。
