@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="749" viewBox="0 0 1100 749">
+<rect x="1" y="1" width="1098" height="747" rx="18" fill="#f6f8fa" stroke="#d0d7de" stroke-width="2"/>
+<text x="40" y="60" font-family="Hiragino Sans, Helvetica Neue, sans-serif" font-size="24" font-weight="600" fill="#1f2328">A Full HD monitor (1920 × 1080)</text>
+<rect x="40" y="96" width="1020.0" height="573.8" rx="6" fill="#ddebff" fill-opacity="1" stroke="#0969da" stroke-width="3"/>
+<text x="1046.0" y="653.8" text-anchor="end" font-family="Hiragino Sans, Helvetica Neue, sans-serif" font-size="22" font-weight="700" fill="#0969da">Mitame: 2560 × 1440</text>
+<rect x="40" y="96" width="765.0" height="430.3" rx="6" fill="#ffffff" fill-opacity="0.85" stroke="#8c959f" stroke-width="3" stroke-dasharray="8 6"/>
+<text x="791.0" y="510.3" text-anchor="end" font-family="Hiragino Sans, Helvetica Neue, sans-serif" font-size="22" font-weight="500" fill="#57606a">As is: 1920 × 1080</text>
+<text x="550.0" y="719.8" text-anchor="middle" font-family="Hiragino Sans, Helvetica Neue, sans-serif" font-size="26" font-weight="700" fill="#1f2328">About 1.8× more room on the same monitor</text>
+</svg>

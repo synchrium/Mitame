@@ -11,7 +11,7 @@ import Foundation
 import Observation
 import ServiceManagement
 
-/// つながっている外部モニター
+/// つながっている画面（外部モニターか内蔵ディスプレイ）
 struct ExternalDisplay: Hashable, Identifiable {
     let vendor: UInt32
     let model: UInt32
@@ -19,31 +19,44 @@ struct ExternalDisplay: Hashable, Identifiable {
     /// モニター本来の解像度（ピクセル）
     let nativeWidth: UInt32
     let nativeHeight: UInt32
+    /// Mac の内蔵ディスプレイ
+    let isBuiltin: Bool
 
-    /// UserDefaults で使う見分け用の名前
-    var id: String { "\(vendor)-\(model)-\(serial)" }
+    /// UserDefaults で使う見分け用の名前（内蔵は 1 つだけなので "builtin"）
+    var id: String { isBuiltin ? Self.builtinID : "\(vendor)-\(model)-\(serial)" }
+    static let builtinID = "builtin"
 
-    /// 4K 以上なら macOS がもとから HiDPI にできる
-    var isAlreadyHiDPI: Bool { nativeWidth >= 3840 || nativeHeight >= 2160 }
+    /// 4K 以上なら macOS がもとから HiDPI にできる。
+    /// 内蔵はもとから Retina だが、標準の設定より広くするために使うので対象にする
+    var isAlreadyHiDPI: Bool { !isBuiltin && (nativeWidth >= 3840 || nativeHeight >= 2160) }
 
-    /// 見た目の大きさの候補（本来の解像度の ×0.75〜×1.33、縦横比はそのまま）
+    /// 見た目の大きさの候補（縦横比はそのまま）。
+    /// 外部モニター：本来の解像度の ×0.75〜×1.33。
+    /// 内蔵：画面の点の数の ×0.7〜×1.0（macOS の「スペースを拡大」より広いところだけ。
+    /// 13 インチの 2560×1600 なら 1800×1125〜2560×1600）
     var lookSizes: [LookSize] {
         guard nativeWidth > 0, nativeHeight > 0 else { return [] }
-        let factors: [Double] = [0.75, 0.8333, 1.0, 1.0667, 1.1333, 1.2, 1.3333]
+        let factors: [Double] = isBuiltin
+            ? [0.7031, 0.75, 0.8, 0.875, 1.0]
+            : [0.75, 0.8333, 1.0, 1.0667, 1.1333, 1.2, 1.3333]
         return factors.compactMap { f in
             // 幅は 8 の倍数、高さは縦横比から出して偶数にそろえる
             let w = UInt32((Double(nativeWidth) * f / 8).rounded()) * 8
-            let h = UInt32((Double(w) * Double(nativeHeight) / Double(nativeWidth) / 2).rounded()) * 2
+            // 割り切れるならそのまま（2560×1600 の 1800 → 1125）、でなければ偶数にそろえる
+            let exact = Double(w) * Double(nativeHeight) / Double(nativeWidth)
+            let h = exact == exact.rounded() ? UInt32(exact) : UInt32((exact / 2).rounded()) * 2
             // 描画は 2 倍なので、8K（7680×4320）を超える大きさは出さない
             guard w * 2 <= 7680, h * 2 <= 4320 else { return nil }
             return LookSize(width: w, height: h, isNative: f == 1.0)
         }
     }
 
-    /// 最初に選ぶ大きさ：少し広い（×1.13）。なければ本来の大きさ
+    /// 最初に選ぶ大きさ：外部は少し広い（×1.13）、内蔵は ×0.75（13 インチで 1920×1200）。
+    /// なければ一番大きいもの
     var defaultLookSize: LookSize? {
         let sizes = lookSizes
-        return sizes.count > 4 ? sizes[4] : sizes.last
+        let index = isBuiltin ? 1 : 4
+        return sizes.count > index ? sizes[index] : sizes.last
     }
 
     init?(_ info: [String: Any]) {
@@ -58,6 +71,7 @@ struct ExternalDisplay: Hashable, Identifiable {
         self.serial = serial
         nativeWidth = w
         nativeHeight = h
+        isBuiltin = (info["builtin"] as? NSNumber)?.boolValue ?? false
     }
 }
 
@@ -113,7 +127,12 @@ final class MirrorController {
 
     var statusText: String {
         guard let display else {
-            if isOn { return String(localized: "モニターをつなぐと HiDPI になります") }
+            if isOn {
+                if defaults.string(forKey: "display") == ExternalDisplay.builtinID {
+                    return String(localized: "Mac を開くと HiDPI になります")
+                }
+                return String(localized: "モニターをつなぐと HiDPI になります")
+            }
             return String(localized: "外部モニターが見つかりません")
         }
         let name = name(of: display)
@@ -130,7 +149,8 @@ final class MirrorController {
     }
 
     func name(of display: ExternalDisplay) -> String {
-        defaults.string(forKey: "name.\(display.id)")
+        if display.isBuiltin { return String(localized: "内蔵ディスプレイ") }
+        return defaults.string(forKey: "name.\(display.id)")
             ?? defaults.string(forKey: "displayName.\(display.vendor)") // bfdc507 までの覚え方
             ?? String(localized: "外部モニター")
     }
@@ -187,7 +207,10 @@ final class MirrorController {
     private func start() {
         refresh()
         if let display, let size {
-            MitameStart(size.width, size.height, display.vendor, display.model, display.serial)
+            // オフのときに代わりに選んでいた画面でオンにしたら、それを覚える
+            defaults.set(display.id, forKey: "display")
+            MitameStart(size.width, size.height, display.isBuiltin,
+                        display.vendor, display.model, display.serial)
             return
         }
         // 抜いているときは、前回のモニターがつながるのを待つ
@@ -197,9 +220,14 @@ final class MirrorController {
             NSLog("no external display")
             return
         }
+        // 内蔵を選んでいてふたを閉じているときは、開くのを待つ
+        if saved == ExternalDisplay.builtinID {
+            MitameStart(savedSize.width, savedSize.height, true, 0, 0, 0)
+            return
+        }
         let parts = saved.split(separator: "-").compactMap { UInt32($0) }
         guard parts.count == 3 else { return }
-        MitameStart(savedSize.width, savedSize.height, parts[0], parts[1], parts[2])
+        MitameStart(savedSize.width, savedSize.height, false, parts[0], parts[1], parts[2])
     }
 
     private func refresh() {
@@ -207,18 +235,26 @@ final class MirrorController {
         isMirroring = MitameIsMirroring()
         launchAtLogin = SMAppService.mainApp.status == .enabled
 
-        let list = MitameListExternalDisplays()
+        let list = MitameListDisplays()
         displays = list.compactMap { ExternalDisplay($0) }
         // 名前は見えたときに覚える（ミラー中は macOS の画面一覧に出てこないため）
         for (info, d) in zip(list, list.map { ExternalDisplay($0) }) {
-            if let d, let name = info["name"] as? String {
+            if let d, !d.isBuiltin, let name = info["name"] as? String {
                 defaults.set(name, forKey: "name.\(d.id)")
             }
         }
 
-        // 選んでいたモニターがつながっていればそれ、なければ最初の 1 台
+        // 選んでいた画面があればそれ。
+        // なければ、オンのときはその画面が戻るのを待ち（nil）、オフのときは外部モニター、次に内蔵
         let saved = defaults.string(forKey: "display")
-        display = displays.first { $0.id == saved } ?? displays.first
+        if let found = displays.first(where: { $0.id == saved }) {
+            display = found
+        } else if (isOn || defaults.bool(forKey: "enabled")) && saved != nil {
+            // 起動した直後はまだ isOn が false なので、保存した「オン」も見る
+            display = nil
+        } else {
+            display = displays.first { !$0.isBuiltin } ?? displays.first
+        }
         if let display {
             if saved == nil { defaults.set(display.id, forKey: "display") }
             let sizes = display.lookSizes

@@ -4,12 +4,12 @@
     "%@": {
       "shouldTranslate": false
     },
-    "%@（%u × %u）": {
+    "%@（%@ × %@）": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "%1$@ (%2$u × %3$u)"
+            "value": "%1$@ (%2$@ × %3$@)"
           }
         }
       }
@@ -20,6 +20,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ (Same as Monitor)"
+          }
+        }
+      }
+    },
+    "%@（画面の点と同じ）": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (Same as Panel Pixels)"
           }
         }
       }
@@ -74,6 +84,16 @@
         }
       }
     },
+    "Mac を開くと HiDPI になります": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open your Mac to turn on HiDPI"
+          }
+        }
+      }
+    },
     "Mitame について": {
       "localizations": {
         "en": {
@@ -124,6 +144,16 @@
         }
       }
     },
+    "内蔵ディスプレイ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Built-in Display"
+          }
+        }
+      }
+    },
     "外部モニター": {
       "localizations": {
         "en": {
@@ -144,12 +174,12 @@
         }
       }
     },
-    "外部モニターを HiDPI（Retina）で表示します。\n\nhidpi-mirror（Petr Baudis、MIT License）の処理を使っています。\nhttps://github.com/pasky/hidpi-mirror": {
+    "外部モニターを HiDPI（Retina）で表示します。\n内蔵ディスプレイを、標準の設定より広く使うこともできます。\n\nhidpi-mirror（Petr Baudis、MIT License）の処理を使っています。\nhttps://github.com/pasky/hidpi-mirror": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Shows your external monitor in HiDPI (Retina).\n\nBased on hidpi-mirror by Petr Baudis (MIT License).\nhttps://github.com/pasky/hidpi-mirror"
+            "value": "Shows your external monitor in HiDPI (Retina).\nIt can also give your built-in display more space than the standard settings.\n\nBased on hidpi-mirror by Petr Baudis (MIT License).\nhttps://github.com/pasky/hidpi-mirror"
           }
         }
       }

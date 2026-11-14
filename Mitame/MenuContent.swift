@@ -30,20 +30,39 @@ struct MenuContent: View {
                 set: { if let s = $0 { controller.setSize(s) } }
             )) {
                 ForEach(display.lookSizes) { size in
-                    Text(size.isNative ? "\(size.label)（モニターと同じ）" : "\(size.label)")
-                        .tag(Optional(size))
+                    Group {
+                        if size.isNative && display.isBuiltin {
+                            Text("\(size.label)（画面の点と同じ）")
+                        } else if size.isNative {
+                            Text("\(size.label)（モニターと同じ）")
+                        } else {
+                            Text("\(size.label)")
+                        }
+                    }
+                    .tag(Optional(size))
                 }
             }
         }
 
-        // 2 台以上つながっているときだけ、どのモニターを HiDPI にするか選ぶ
-        if controller.displays.count > 1 {
+        // どの画面を HiDPI にするか選ぶ。2 つ以上あるとき、
+        // または選んでいた外部モニターを抜いている（内蔵に切り替えられるように）とき
+        if controller.displays.count > 1
+            || (controller.display == nil && !controller.displays.isEmpty) {
             Picker("モニター", selection: Binding(
                 get: { controller.display },
                 set: { if let d = $0 { controller.selectDisplay(d) } }
             )) {
                 ForEach(controller.displays) { d in
-                    Text("\(controller.name(of: d))（\(d.nativeWidth) × \(d.nativeHeight)）")
+                    Group {
+                        // 同じ名前のモニターがほかにあるときだけ、点の数を付けて見分ける
+                        // （String にしてカンマ区切りにしない）
+                        let name = controller.name(of: d)
+                        if controller.displays.filter({ controller.name(of: $0) == name }).count > 1 {
+                            Text("\(name)（\(String(d.nativeWidth)) × \(String(d.nativeHeight))）")
+                        } else {
+                            Text(verbatim: name)
+                        }
+                    }
                         .tag(Optional(d))
                 }
             }
@@ -68,6 +87,7 @@ struct MenuContent: View {
     private func showAbout() {
         let credits = String(localized: """
         外部モニターを HiDPI（Retina）で表示します。
+        内蔵ディスプレイを、標準の設定より広く使うこともできます。
 
         hidpi-mirror（Petr Baudis、MIT License）の処理を使っています。
         https://github.com/pasky/hidpi-mirror

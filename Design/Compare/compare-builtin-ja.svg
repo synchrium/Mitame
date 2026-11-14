@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="813" viewBox="0 0 1100 813">
+<rect x="1" y="1" width="1098" height="811" rx="18" fill="#f6f8fa" stroke="#d0d7de" stroke-width="2"/>
+<text x="40" y="60" font-family="Hiragino Sans, Helvetica Neue, sans-serif" font-size="24" font-weight="600" fill="#1f2328">13 インチの MacBook Air（画面は 2560 × 1600）</text>
+<rect x="40" y="96" width="1020.0" height="637.5" rx="6" fill="#ddebff" fill-opacity="1" stroke="#0969da" stroke-width="3"/>
+<text x="1046.0" y="717.5" text-anchor="end" font-family="Hiragino Sans, Helvetica Neue, sans-serif" font-size="22" font-weight="700" fill="#0969da">Mitame：1920 × 1200</text>
+<rect x="40" y="96" width="892.5" height="557.8" rx="6" fill="#ffffff" fill-opacity="0.85" stroke="#8c959f" stroke-width="3" stroke-dasharray="8 6"/>
+<text x="918.5" y="637.8" text-anchor="end" font-family="Hiragino Sans, Helvetica Neue, sans-serif" font-size="22" font-weight="500" fill="#57606a">スペースを拡大（macOS の上限）：1680 × 1050</text>
+<rect x="40" y="96" width="765.0" height="478.1" rx="6" fill="#ffffff" fill-opacity="0.85" stroke="#8c959f" stroke-width="3" stroke-dasharray="8 6"/>
+<text x="791.0" y="558.1" text-anchor="end" font-family="Hiragino Sans, Helvetica Neue, sans-serif" font-size="22" font-weight="500" fill="#57606a">デフォルト：1440 × 900</text>
+<text x="550.0" y="783.5" text-anchor="middle" font-family="Hiragino Sans, Helvetica Neue, sans-serif" font-size="26" font-weight="700" fill="#1f2328">macOS の上限より約 1.3 倍、デフォルトより約 1.8 倍広い</text>
+</svg>

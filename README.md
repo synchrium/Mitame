@@ -1,14 +1,15 @@
 # Mitame
 
-**Sharp, Retina-like text on your non-4K external monitor.**
+**Sharp, Retina-like text on your non-4K monitor — and more room on your MacBook's screen.**
 
 [日本語](README.ja.md)
 
 When you connect a Full HD or QHD monitor to a Mac, text often looks soft or blurry,
 because macOS only uses its sharp HiDPI (Retina) rendering on high-resolution screens.
 Mitame is a small, free menu bar app that turns on HiDPI for your external monitor with one click.
+It can also give your MacBook's built-in display more room than the macOS settings allow (up to 1920 × 1200 on a 13-inch MacBook Air), while keeping text sharp.
 
-<p align="center"><img src="docs/images/menu-en.png" width="520" alt="The Mitame menu in the menu bar, with HiDPI turned on and the Looks Like sizes for a Full HD monitor"></p>
+<p align="center"><img src="docs/images/menu-en.png" width="520" alt="The Mitame menu in the menu bar, with the built-in display in HiDPI and the Looks Like sizes from 1800 × 1125 to 2560 × 1600, with 1920 × 1200 selected"></p>
 
 *Mitame* (見た目) is Japanese for "how things look". It is a sister app of [Nakami](https://github.com/synchrium/Nakami) ("contents").
 
@@ -19,14 +20,21 @@ Mitame is a small, free menu bar app that turns on HiDPI for your external monit
 ## Features
 
 - **One click** — choose **HiDPI** in the menu bar, and your monitor switches in a few seconds
-- **Choose how big things look** — seven sizes based on your monitor's own resolution and shape (16:9, 16:10, 21:9, …)
+- **More room** — even on a Full HD monitor, you can choose to look like 2560 × 1440 (the same room as QHD, about 1.8×)
+- **More room on your MacBook, too** <sup>v0.2</sup> — use the built-in display with more space than macOS's **More Space** setting (five sizes from 1800 × 1125 to 2560 × 1600 on a 13-inch MacBook Air)
+- **Choose how big things look** — for external monitors, seven sizes based on the monitor's own resolution and shape (16:9, 16:10, 21:9, …)
+- **Keeps your main display** <sup>v0.2</sup> — if you use the built-in display as the main display and the monitor as an extended one, Mitame keeps that arrangement
 - **Comes back by itself** — after sleep, restarting your Mac, or unplugging and plugging in the cable
-- **No flicker after sleep** — Mitame leaves the screen alone while the Mac sleeps and lets macOS restore it
+- **No flicker** — Mitame leaves the screen alone while the Mac sleeps and lets macOS restore it, and sets the external monitor to a flicker-free mode before mirroring
 - **Open at Login**
-- **More than one monitor?** Choose which monitor to make HiDPI
+- **Choose which display to make HiDPI** — with two or more monitors, or the built-in display (one display at a time)
 - **Quit to undo** — when you quit Mitame, your monitor goes back to how it was
 - **English and Japanese**
 - **Works offline** — Mitame does not connect to the internet and does not collect any data
+
+<p align="center"><img src="docs/images/compare-external-en.png" width="560" alt="How much room a Full HD monitor gets: 1920 × 1080 as is, and 2560 × 1440 with Mitame, about 1.8 times more"></p>
+<p align="center"><img src="docs/images/compare-builtin-en.png" width="560" alt="How much room a 13-inch MacBook Air gets: Default 1440 × 900, More Space (the macOS maximum) 1680 × 1050, and 1920 × 1200 with Mitame"></p>
+<p align="center"><img src="docs/images/side-by-side.png" width="720" alt="A 13-inch MacBook Air set to 1920 × 1200 with Mitame, showing two GitHub pages side by side"><br><sub>A 13-inch MacBook Air at 1920 × 1200 with Mitame. Two browser windows side by side, with room to spare</sub></p>
 
 ## How it works
 
@@ -47,15 +55,16 @@ Mitame adds a menu bar app around it.
 
 - macOS 14 Sonoma or later
 - A Mac with Apple silicon or an Intel processor
-- An external monitor that is **not** 4K or higher (4K and 5K monitors are already HiDPI in macOS, so Mitame is not needed)
+- An external monitor that is **not** 4K or higher (4K and 5K monitors are already HiDPI in macOS, so Mitame is not needed), or a MacBook's built-in display
 
 ### Tested setups
 
 | Mac | macOS | Monitor | Result |
 | --- | --- | --- | --- |
 | MacBook Air (M1) | 27.2 | 24" Full HD (1920 × 1080, 16:9), USB-C to HDMI | Works, including sleep, restart, unplugging, and lid closed |
+| MacBook Air (M1) | 27.2 | Built-in display (13.3", 2560 × 1600) | Works (1800 × 1125 to 2560 × 1600, and switching with the external monitor) |
 
-Not tested yet: macOS 14–26, Intel Macs, QHD / 16:10 / ultrawide monitors, two or more monitors, DisplayLink adapters.
+Not tested yet: macOS 14–26, Intel Macs, built-in displays of 14-inch and larger MacBooks, QHD / 16:10 / ultrawide monitors, two or more monitors, DisplayLink adapters.
 If you try one of these, please [let us know](https://github.com/synchrium/Mitame/issues).
 
 ## Install
@@ -102,12 +111,13 @@ Click the monitor icon in the menu bar.
 | Menu | What it does |
 | --- | --- |
 | **HiDPI** | Turns HiDPI on or off for your monitor |
-| **Looks Like** | How big things look. Bigger numbers fit more on the screen (smaller text). "Same as Monitor" keeps the size you have now, only sharper |
-| **Monitor** | Shown when two or more monitors are connected. Chooses which one to make HiDPI |
+| **Looks Like** | How big things look. Bigger numbers fit more on the screen (smaller text). For an external monitor, "Same as Monitor" keeps the size you have now, only sharper. For the built-in display, "Same as Panel Pixels" gives the most room |
+| **Monitor** | Shown when an external monitor is connected. Chooses which display (including the built-in one) to make HiDPI. Mitame remembers the size for each display |
 | **Rebuild** | Creates the virtual display again. Try this if the screen ever looks wrong |
 | **Open at Login** | Starts Mitame when you log in. If HiDPI was on, it turns on again |
 
 Mitame remembers your choices. If you unplug the monitor while HiDPI is on, Mitame waits and turns it back on when you plug it in.
+If you chose the built-in display and close the lid, it comes back when you open it.
 
 ## If something goes wrong
 

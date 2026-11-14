@@ -60,25 +60,88 @@
 static uint32_t gVendor = 4268; // 0x10AC = Dell; override via argv[3]
 // Mitame: 同じメーカーのモニターが 2 台あっても見分けられるように、型番とシリアルでも探す
 static uint32_t gModel = 0, gSerial = 0;
+// Mitame: YES なら外部モニターではなく内蔵ディスプレイを HiDPI にする
+static BOOL gBuiltin = NO;
+// Mitame: メインの画面を、利用者が使っていたとおりにしておくための覚え。
+// gTargetWasMain：HiDPI にする画面がメインだったか（最初は YES＝元の hidpi-mirror と同じ動き）。
+// gOtherMain：そうでないとき、メインだった実際の画面。
+// 切り替える直前と、落ち着いて動いている間（システム設定でメインを変えたとき）に覚え直す
+static BOOL gTargetWasMain = YES;
+static CGDirectDisplayID gOtherMain = 0;
+
+// Mitame: gTargetWasMain を、HiDPI にする画面ごとに設定ファイルにも残す（再起動のあと、
+// 画面がまだ見えないうちに起動しても、前の使い方がわかるように）。
+// キーは targetWasMain.builtin / targetWasMain.<vendor>-<model>-<serial>
+static NSString *mainKey(BOOL builtin, uint32_t vendor, uint32_t model, uint32_t serial) {
+    return builtin ? @"targetWasMain.builtin"
+                   : [NSString stringWithFormat:@"targetWasMain.%u-%u-%u", vendor, model, serial];
+}
+
+static void saveTargetWasMain(void) {
+    [NSUserDefaults.standardUserDefaults setBool:gTargetWasMain
+                                          forKey:mainKey(gBuiltin, gVendor, gModel, gSerial)];
+}
 #define MITAME_VIRTUAL_VENDOR 0xB33F
 
 static CGVirtualDisplay *gVirtual = nil;  // keep-alive
 static CGDirectDisplayID gVirtualID = 0;
 static unsigned int gLW = 2048, gLH = 1152; // desired "looks like" size
 
+// Mitame: d が HiDPI にしたい画面か（内蔵なら内蔵かどうかだけ、外部ならメーカー・型番・シリアル）
+static BOOL isTarget(CGDirectDisplayID d) {
+    if (d == gVirtualID) return NO;
+    if (gBuiltin) return CGDisplayIsBuiltin(d);
+    if (CGDisplayIsBuiltin(d)) return NO;
+    return CGDisplayVendorNumber(d) == gVendor &&
+           (!gModel || CGDisplayModelNumber(d) == gModel) &&
+           (!gSerial || CGDisplaySerialNumber(d) == gSerial);
+}
+
 static CGDirectDisplayID findDell(void) {
     CGDirectDisplayID ids[16];
     uint32_t count = 0;
     CGGetOnlineDisplayList(16, ids, &count);
-    for (uint32_t i = 0; i < count; i++) {
-        if (CGDisplayIsBuiltin(ids[i])) continue;
-        if (ids[i] == gVirtualID) continue;
-        if (CGDisplayVendorNumber(ids[i]) == gVendor &&
-            (!gModel || CGDisplayModelNumber(ids[i]) == gModel) &&
-            (!gSerial || CGDisplaySerialNumber(ids[i]) == gSerial))
-            return ids[i];
-    }
+    for (uint32_t i = 0; i < count; i++)
+        if (isTarget(ids[i])) return ids[i];
     return kCGNullDirectDisplay;
+}
+
+// Mitame: メインになっている実際の画面。仮想ディスプレイ（Mitame・hidpi-mirror）がメインなら、
+// それを映している画面を返す
+static CGDirectDisplayID physicalMain(void) {
+    CGDirectDisplayID main = CGMainDisplayID();
+    if (main != gVirtualID && CGDisplayVendorNumber(main) != MITAME_VIRTUAL_VENDOR)
+        return main;
+    CGDirectDisplayID ids[16];
+    uint32_t n = 0;
+    if (CGGetOnlineDisplayList(16, ids, &n) != kCGErrorSuccess) return main;
+    for (uint32_t i = 0; i < n; i++)
+        if (CGDisplayMirrorsDisplay(ids[i]) == main) return ids[i];
+    return main;
+}
+
+static BOOL displayOnline(CGDirectDisplayID d) {
+    CGDirectDisplayID ids[16];
+    uint32_t n = 0;
+    if (!d || CGGetOnlineDisplayList(16, ids, &n) != kCGErrorSuccess) return NO;
+    for (uint32_t i = 0; i < n; i++)
+        if (ids[i] == d) return YES;
+    return NO;
+}
+
+// Mitame: HiDPI にしている画面と仮想ディスプレイのほかに、ふつうの画面（内蔵・外部）があるか
+static BOOL otherOnline(void) {
+    CGDirectDisplayID ids[16];
+    uint32_t n = 0;
+    if (CGGetOnlineDisplayList(16, ids, &n) != kCGErrorSuccess) return NO;
+    for (uint32_t i = 0; i < n; i++) {
+        CGDirectDisplayID d = ids[i];
+        if (d == gVirtualID || isTarget(d)) continue;
+        if (CGDisplayVendorNumber(d) == MITAME_VIRTUAL_VENDOR) continue;
+        if (CGDisplayMirrorsDisplay(d) != kCGNullDirectDisplay) continue;
+        return YES;
+    }
+    return NO;
 }
 
 // Find the HiDPI mode (points = gLW x gLH, pixels = 2x) on the virtual
@@ -119,8 +182,7 @@ static BOOL displaysAsleep(void) {
     uint32_t n = 0;
     if (CGGetOnlineDisplayList(16, ids, &n) != kCGErrorSuccess) return YES;
     for (uint32_t i = 0; i < n; i++)
-        if ((CGDisplayIsBuiltin(ids[i]) ||
-             CGDisplayVendorNumber(ids[i]) == gVendor) &&
+        if ((CGDisplayIsBuiltin(ids[i]) || isTarget(ids[i])) &&
             !CGDisplayIsAsleep(ids[i]))
             return NO;
     return YES;
@@ -132,11 +194,13 @@ static BOOL displaysAsleep(void) {
 // arrangement so the virtual display lands on (0,0): setting just one
 // display's origin is silently normalized away. Separate transaction
 // after the mirror. Returns YES once the mirror set is main.
-static BOOL claimMain(void) {
-    CGRect vb = CGDisplayBounds(gVirtualID);
+// Mitame: 仮想ディスプレイに限らず、指定した画面 target をメインにできるようにした
+static BOOL makeMain(CGDirectDisplayID target) {
+    CGRect vb = CGDisplayBounds(target);
     int32_t dx = (int32_t)vb.origin.x, dy = (int32_t)vb.origin.y;
     if (dx == 0 && dy == 0) {
-        NSLog(@"claimMain: mirror set already main");
+        NSLog(@"claimMain: %s already main",
+              target == gVirtualID ? "mirror set" : "previous main display");
         return YES;
     }
     CGDirectDisplayID ids[16];
@@ -161,6 +225,49 @@ static BOOL claimMain(void) {
     NSLog(@"claimMain: shift arrangement by (%d,%d): %s (err=%d)", -dx, -dy,
           err == kCGErrorSuccess ? "OK" : "FAILED", err);
     return err == kCGErrorSuccess;
+}
+
+static BOOL claimMain(void) {
+    // Mitame: HiDPI にした画面がもともとメインでなく、ほかの画面があるなら、
+    // メインは前の画面のまま（ミラーで macOS が動かしてしまったら戻す）
+    if (!gTargetWasMain && otherOnline()) {
+        if (!displayOnline(gOtherMain)) {
+            // 前のメインの画面が分からない・いないとき（再起動した直後など）は、
+            // 内蔵があれば内蔵、なければほかの最初の画面
+            CGDirectDisplayID ids[16];
+            uint32_t n = 0;
+            CGDirectDisplayID pick = 0;
+            if (CGGetOnlineDisplayList(16, ids, &n) == kCGErrorSuccess) {
+                for (uint32_t i = 0; i < n; i++) {
+                    CGDirectDisplayID d = ids[i];
+                    if (d == gVirtualID || isTarget(d)) continue;
+                    if (CGDisplayVendorNumber(d) == MITAME_VIRTUAL_VENDOR) continue;
+                    if (CGDisplayMirrorsDisplay(d) != kCGNullDirectDisplay) continue;
+                    if (!pick || CGDisplayIsBuiltin(d)) pick = d;
+                }
+            }
+            if (!pick) {
+                NSLog(@"claimMain: no other display, leaving main alone");
+                return YES;
+            }
+            NSLog(@"claimMain: previous main display unknown, using %u", pick);
+            gOtherMain = pick;
+        }
+        return makeMain(gOtherMain);
+    }
+    return makeMain(gVirtualID);
+}
+
+// Mitame: 落ち着いて動いている間に、どの画面がメインかを覚え直す（システム設定で変えたとき用）
+static void learnMain(void) {
+    BOOL targetMain = (CGMainDisplayID() == gVirtualID);
+    CGDirectDisplayID other = targetMain ? gOtherMain : physicalMain();
+    if (targetMain == gTargetWasMain && other == gOtherMain) return;
+    gTargetWasMain = targetMain;
+    gOtherMain = other;
+    saveTargetWasMain();
+    NSLog(@"main display is now %s (%u)", targetMain ? "the mirror set" : "another display",
+          targetMain ? gVirtualID : other);
 }
 
 // Bumped on every mirror attempt and whenever the Dell is offline or the
@@ -202,6 +309,68 @@ static BOOL createVirtual(void);
 static void destroyVirtual(void);
 static void notifyChange(void);
 
+// Mitame: 外部モニターを本来の 1 倍のモード（ネイティブ・一番高いリフレッシュレート）にする。
+// ミラーを外したあと、macOS が「1920×1080 を 3840×2160 で描く」ような HiDPI のモードを残すことがあり、
+// その状態からミラーにすると、マウスや文字入力のたびに外部モニターがちらつく（2026-11-14 に確認）。
+// 内蔵ディスプレイではちらつきが出ていないので触らない。設定はこのログインの間だけ
+static void setNativeMode(CGDirectDisplayID d) {
+    if (!d || CGDisplayIsBuiltin(d)) return;
+    CGDisplayModeRef cur = CGDisplayCopyDisplayMode(d);
+    if (cur) {
+        BOOL ok = (CGDisplayModeGetIOFlags(cur) & kDisplayModeNativeFlag) &&
+                  CGDisplayModeGetPixelWidth(cur) == CGDisplayModeGetWidth(cur);
+        CFRelease(cur);
+        if (ok) return;
+    }
+    CFStringRef k = kCGDisplayShowDuplicateLowResolutionModes;
+    CFBooleanRef v = kCFBooleanTrue;
+    CFDictionaryRef opts = CFDictionaryCreate(
+        NULL, (const void **)&k, (const void **)&v, 1,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFArrayRef modes = CGDisplayCopyAllDisplayModes(d, opts);
+    CFRelease(opts);
+    if (!modes) return;
+    CGDisplayModeRef best = NULL;
+    for (CFIndex i = 0; i < CFArrayGetCount(modes); i++) {
+        CGDisplayModeRef m = (CGDisplayModeRef)CFArrayGetValueAtIndex(modes, i);
+        if (!(CGDisplayModeGetIOFlags(m) & kDisplayModeNativeFlag)) continue;
+        if (CGDisplayModeGetPixelWidth(m) != CGDisplayModeGetWidth(m)) continue; // 1 倍だけ
+        if (!best || CGDisplayModeGetPixelWidth(m) * CGDisplayModeGetPixelHeight(m) >
+                         CGDisplayModeGetPixelWidth(best) * CGDisplayModeGetPixelHeight(best) ||
+            (CGDisplayModeGetPixelWidth(m) == CGDisplayModeGetPixelWidth(best) &&
+             CGDisplayModeGetRefreshRate(m) > CGDisplayModeGetRefreshRate(best)))
+            best = m;
+    }
+    if (best) {
+        CGDisplayConfigRef cfg;
+        if (CGBeginDisplayConfiguration(&cfg) == kCGErrorSuccess) {
+            CGConfigureDisplayWithDisplayMode(cfg, d, best, NULL);
+            CGError err = CGCompleteDisplayConfiguration(cfg, kCGConfigureForSession);
+            NSLog(@"set native mode %zux%zu@%.0f on %u: err=%d",
+                  CGDisplayModeGetWidth(best), CGDisplayModeGetHeight(best),
+                  CGDisplayModeGetRefreshRate(best), d, err);
+        }
+    }
+    CFRelease(modes);
+}
+
+// Mitame: HiDPI にする画面と仮想ディスプレイ以外の、ふつうの画面のモードを今のままにする
+static void keepOtherModes(CGDisplayConfigRef cfg, CGDirectDisplayID target) {
+    CGDirectDisplayID ids[16];
+    uint32_t n = 0;
+    if (CGGetOnlineDisplayList(16, ids, &n) != kCGErrorSuccess) return;
+    for (uint32_t i = 0; i < n; i++) {
+        CGDirectDisplayID d = ids[i];
+        if (d == target || d == gVirtualID) continue;
+        if (CGDisplayVendorNumber(d) == MITAME_VIRTUAL_VENDOR) continue;
+        if (CGDisplayMirrorsDisplay(d) != kCGNullDirectDisplay) continue;
+        CGDisplayModeRef m = CGDisplayCopyDisplayMode(d);
+        if (!m) continue;
+        CGConfigureDisplayWithDisplayMode(cfg, d, m, NULL);
+        CFRelease(m);
+    }
+}
+
 static void mirrorNow(void) {
     static BOOL wasOffline = NO, wasAsleep = NO;
     if (!gWanted || gSystemAsleep) return;
@@ -231,6 +400,8 @@ static void mirrorNow(void) {
     wasOffline = NO;
     // Mitame: モニターが（また）あるのに仮想ディスプレイがなければ作る
     if (!gVirtual) {
+        // macOS が覚えている配置から自分でミラーを戻すこともあるので、作る前に本来のモードにしておく
+        setNativeMode(dell);
         if (!createVirtual()) return; // 次の見回りでまた試す
         gStartTime = CFAbsoluteTimeGetCurrent();
         armClaim();
@@ -248,8 +419,11 @@ static void mirrorNow(void) {
     if (curMode) CFRelease(curMode);
     if (mirrored && rightMode) {
         if (gClaimPending) tryClaim();
+        else learnMain();
         return;
     }
+    // Mitame: ふつうの表示の外部モニターをミラーにする前に、本来の 1 倍のモードに戻す（ちらつき対策）
+    if (!mirrored) setNativeMode(dell);
     CGDisplayModeRef want = rightMode ? NULL : copyWantedMode();
     NSLog(@"mirrorNow: mirrored=%d rightMode=%d want=%s", mirrored, rightMode,
           want ? "found" : "NULL");
@@ -266,6 +440,9 @@ static void mirrorNow(void) {
             NSLog(@"  CGConfigureDisplayWithDisplayMode: err=%d", e1);
         }
         if (!mirrored) CGConfigureDisplayMirrorOfDisplay(cfg, dell, gVirtualID);
+        // Mitame: ほかの画面（内蔵など）は今のモードのままと伝える。伝えないと、配置を保存するときに
+        // macOS が古い保存の値に戻すことがある（内蔵が「スペースを拡大」から「デフォルト」に戻った、2026-11-14）
+        keepOtherModes(cfg, dell);
         err = CGCompleteDisplayConfiguration(cfg, options[i]);
         NSLog(@"mode+mirror transaction (%s): %s (err=%d)",
               i == 0 ? "session" : "permanent",
@@ -304,6 +481,8 @@ static void unmirror(void) {
     // unmirrored arrangement that WindowServer would later restore.
     CGCompleteDisplayConfiguration(cfg, kCGConfigureForSession);
     NSLog(@"unmirrored");
+    // Mitame: ミラーを外したあとに変わったモードが残らないように、本来の 1 倍のモードに戻す
+    setNativeMode(dell);
 }
 
 static void reconfigCB(CGDirectDisplayID d, CGDisplayChangeSummaryFlags flags,
@@ -313,8 +492,7 @@ static void reconfigCB(CGDirectDisplayID d, CGDisplayChangeSummaryFlags flags,
     // poll never saw it offline (quick replug, or unplugged while asleep);
     // a removal also invalidates pending claimMain follow-ups.
     if (((flags & kCGDisplayRemoveFlag) && d == gLastDell) ||
-        ((flags & kCGDisplayAddFlag) && d != gVirtualID &&
-         CGDisplayVendorNumber(d) == gVendor)) {
+        ((flags & kCGDisplayAddFlag) && isTarget(d))) {
         gMirrorSeq++;
         armClaim();
     }
@@ -631,11 +809,36 @@ static void registerSleepObservers(void) {
     });
 }
 
-BOOL MitameStart(unsigned int width, unsigned int height,
+BOOL MitameStart(unsigned int width, unsigned int height, BOOL builtin,
                  uint32_t vendor, uint32_t model, uint32_t serial) {
+    // どの画面がメインだったかは、今のミラーを外す前に見る。
+    // 新しく HiDPI にする画面を探すため、いったん新しい設定に入れ替えてから戻す
+    {
+        BOOL ob = gBuiltin;
+        uint32_t ov = gVendor, om = gModel, os = gSerial;
+        gBuiltin = builtin; gVendor = vendor; gModel = model; gSerial = serial;
+        CGDirectDisplayID target = findDell();
+        gBuiltin = ob; gVendor = ov; gModel = om; gSerial = os;
+        if (target) {
+            CGDirectDisplayID pm = physicalMain();
+            gTargetWasMain = (pm == target);
+            if (!gTargetWasMain) gOtherMain = pm;
+            [NSUserDefaults.standardUserDefaults setBool:gTargetWasMain
+                                                  forKey:mainKey(builtin, vendor, model, serial)];
+        } else {
+            // 見えないとき（抜いている・ふたを閉じている・起動した直後）は、保存した覚えを使う。
+            // 覚えがなければ YES（元の hidpi-mirror と同じ動き）
+            id saved = [NSUserDefaults.standardUserDefaults
+                objectForKey:mainKey(builtin, vendor, model, serial)];
+            gTargetWasMain = saved ? [saved boolValue] : YES;
+            gOtherMain = 0; // 前のメインの画面はつながったときに探す
+        }
+        NSLog(@"target was main: %d (other main %u)", gTargetWasMain, gOtherMain);
+    }
     destroyVirtual();
     gLW = width;
     gLH = height;
+    gBuiltin = builtin;
     gVendor = vendor;
     gModel = model;
     gSerial = serial;
@@ -696,7 +899,7 @@ void MitameStop(void) {
 void MitameRebuild(void) {
     if (!gWanted) return;
     NSLog(@"rebuilding virtual display");
-    MitameStart(gLW, gLH, gVendor, gModel, gSerial);
+    MitameStart(gLW, gLH, gBuiltin, gVendor, gModel, gSerial);
 }
 
 BOOL MitameIsRunning(void) { return gWanted; }
@@ -737,14 +940,14 @@ static NSString *screenName(CGDirectDisplayID d) {
     return nil;
 }
 
-NSArray<NSDictionary<NSString *, id> *> *MitameListExternalDisplays(void) {
+NSArray<NSDictionary<NSString *, id> *> *MitameListDisplays(void) {
     NSMutableArray *list = [NSMutableArray array];
     CGDirectDisplayID ids[16];
     uint32_t n = 0;
     if (CGGetOnlineDisplayList(16, ids, &n) != kCGErrorSuccess) return list;
     for (uint32_t i = 0; i < n; i++) {
         CGDirectDisplayID d = ids[i];
-        if (CGDisplayIsBuiltin(d) || d == gVirtualID) continue;
+        if (d == gVirtualID) continue;
         if (CGDisplayVendorNumber(d) == MITAME_VIRTUAL_VENDOR) continue; // Mitame・hidpi-mirror
         CGSize px = nativePixels(d);
         NSMutableDictionary *info = [@{
@@ -753,6 +956,7 @@ NSArray<NSDictionary<NSString *, id> *> *MitameListExternalDisplays(void) {
             @"serial": @(CGDisplaySerialNumber(d)),
             @"nativeWidth": @((unsigned int)px.width),
             @"nativeHeight": @((unsigned int)px.height),
+            @"builtin": @((BOOL)CGDisplayIsBuiltin(d)),
         } mutableCopy];
         NSString *name = screenName(d); // ミラー中は出てこない
         if (name) info[@"name"] = name;
