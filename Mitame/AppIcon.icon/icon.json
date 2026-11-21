@@ -9,15 +9,15 @@
     {
       "layers": [
         {
-          "glass": false,
-          "image-name": "face.svg",
-          "name": "face"
+          "glass": true,
+          "image-name": "dashed.svg",
+          "name": "dashed"
         }
       ],
-      "name": "Face",
+      "name": "Dashed",
       "shadow": {
         "kind": "neutral",
-        "opacity": 0.3
+        "opacity": 0.4
       },
       "translucency": {
         "enabled": false,
@@ -28,11 +28,11 @@
       "layers": [
         {
           "glass": true,
-          "image-name": "monitor.svg",
-          "name": "monitor"
+          "image-name": "frame.svg",
+          "name": "frame"
         }
       ],
-      "name": "Monitor",
+      "name": "Frame",
       "shadow": {
         "kind": "neutral",
         "opacity": 0.5
@@ -45,20 +45,19 @@
     {
       "layers": [
         {
-          "glass": true,
-          "image-name": "back.svg",
-          "name": "back",
-          "opacity": 0.45
+          "glass": false,
+          "image-name": "screen.svg",
+          "name": "screen"
         }
       ],
-      "name": "Back",
+      "name": "Screen",
       "shadow": {
-        "kind": "neutral",
-        "opacity": 0.3
+        "kind": "none",
+        "opacity": 0
       },
       "translucency": {
-        "enabled": true,
-        "value": 0.5
+        "enabled": false,
+        "value": 0
       }
     }
   ],

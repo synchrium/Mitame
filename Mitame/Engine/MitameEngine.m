@@ -260,6 +260,9 @@ static BOOL claimMain(void) {
 
 // Mitame: 落ち着いて動いている間に、どの画面がメインかを覚え直す（システム設定で変えたとき用）
 static void learnMain(void) {
+    // ほかに画面が無ければ、どれがメインかは決まりきっているので覚え直さない
+    // （代わりに HiDPI にしている間に、ふだんの覚えを書き換えないため、v0.3）
+    if (!otherOnline()) return;
     BOOL targetMain = (CGMainDisplayID() == gVirtualID);
     CGDirectDisplayID other = targetMain ? gOtherMain : physicalMain();
     if (targetMain == gTargetWasMain && other == gOtherMain) return;
@@ -371,6 +374,19 @@ static void keepOtherModes(CGDisplayConfigRef cfg, CGDirectDisplayID target) {
     }
 }
 
+// Mitame: 外部モニターをつないでミラーにしたあと、マウスカーソルの残像が残ることがある（2026-11-21 の報告）。
+// カーソルを今の位置へ置き直して、macOS に描き直させる。動かないのでユーザーには見えない
+static void refreshCursor(void) {
+    CGEventRef ev = CGEventCreate(NULL);
+    if (!ev) return;
+    CGPoint p = CGEventGetLocation(ev);
+    CFRelease(ev);
+    CGWarpMouseCursorPosition(p);
+    // 置き直したあと、少しのあいだマウスが止まるのを防ぐ
+    CGAssociateMouseAndMouseCursorPosition(true);
+    NSLog(@"cursor refreshed at (%.0f,%.0f)", p.x, p.y);
+}
+
 static void mirrorNow(void) {
     static BOOL wasOffline = NO, wasAsleep = NO;
     if (!gWanted || gSystemAsleep) return;
@@ -461,6 +477,11 @@ static void mirrorNow(void) {
             findDell() == dell && CGDisplayMirrorsDisplay(dell) == gVirtualID) {
             tryClaim();
         }
+        // 新しくミラーにできたら、カーソルの残像を消すために描き直させる
+        if (!mirrored && err == kCGErrorSuccess && seq == gMirrorSeq &&
+            findDell() == dell && CGDisplayMirrorsDisplay(dell) == gVirtualID) {
+            refreshCursor();
+        }
         CGDisplayModeRef cur = CGDisplayCopyDisplayMode(gVirtualID);
         if (!cur) return;
         CFAutorelease(cur);
@@ -501,7 +522,8 @@ static void reconfigCB(CGDirectDisplayID d, CGDisplayChangeSummaryFlags flags,
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC),
                        dispatch_get_main_queue(), ^{ mirrorNow(); });
     }
-    if (flags & (kCGDisplayAddFlag | kCGDisplayRemoveFlag)) notifyChange();
+    if (flags & (kCGDisplayAddFlag | kCGDisplayRemoveFlag |
+                 kCGDisplayEnabledFlag | kCGDisplayDisabledFlag)) notifyChange();
     if (flags & kCGDisplayAddFlag) {
         // Display (re)appeared -- e.g. KVM switched back. Give WindowServer
         // a moment to settle, then re-establish the mirror.
@@ -809,24 +831,41 @@ static void registerSleepObservers(void) {
     });
 }
 
-BOOL MitameStart(unsigned int width, unsigned int height, BOOL builtin,
-                 uint32_t vendor, uint32_t model, uint32_t serial) {
+static BOOL startImpl(unsigned int width, unsigned int height, BOOL builtin,
+                      uint32_t vendor, uint32_t model, uint32_t serial,
+                      BOOL useSavedMain) {
     // どの画面がメインだったかは、今のミラーを外す前に見る。
-    // 新しく HiDPI にする画面を探すため、いったん新しい設定に入れ替えてから戻す
+    // 新しく HiDPI にする画面を探すため、いったん新しい設定に入れ替えてから戻す。
+    // 自動の切り替え（useSavedMain）では、今の並びは前の画面のためのものなので、保存した覚えを使う
     {
         BOOL ob = gBuiltin;
         uint32_t ov = gVendor, om = gModel, os = gSerial;
         gBuiltin = builtin; gVendor = vendor; gModel = model; gSerial = serial;
         CGDirectDisplayID target = findDell();
+        // ほかに本物の画面が無ければ、どれがメインかは決まりきっているので覚え直さない
+        // （ふたを閉じて外付けだけのときに起動して「外付けがメイン」と覚えてしまった、2026-11-21）
+        BOOL others = NO;
+        {
+            CGDirectDisplayID ids[16];
+            uint32_t n = 0;
+            if (CGGetOnlineDisplayList(16, ids, &n) == kCGErrorSuccess) {
+                for (uint32_t i = 0; i < n; i++) {
+                    CGDirectDisplayID d = ids[i];
+                    if (d == target || d == gVirtualID) continue;
+                    if (CGDisplayVendorNumber(d) == MITAME_VIRTUAL_VENDOR) continue;
+                    others = YES;
+                }
+            }
+        }
         gBuiltin = ob; gVendor = ov; gModel = om; gSerial = os;
-        if (target) {
+        if (target && others && !useSavedMain) {
             CGDirectDisplayID pm = physicalMain();
             gTargetWasMain = (pm == target);
             if (!gTargetWasMain) gOtherMain = pm;
             [NSUserDefaults.standardUserDefaults setBool:gTargetWasMain
                                                   forKey:mainKey(builtin, vendor, model, serial)];
         } else {
-            // 見えないとき（抜いている・ふたを閉じている・起動した直後）は、保存した覚えを使う。
+            // 見えないとき（抜いている・ふたを閉じている・起動した直後）や、ほかに画面が無いときは、保存した覚えを使う。
             // 覚えがなければ YES（元の hidpi-mirror と同じ動き）
             id saved = [NSUserDefaults.standardUserDefaults
                 objectForKey:mainKey(builtin, vendor, model, serial)];
@@ -878,6 +917,17 @@ BOOL MitameStart(unsigned int width, unsigned int height, BOOL builtin,
     }
     notifyChange();
     return gVirtual != nil || findDell() == kCGNullDirectDisplay;
+}
+
+BOOL MitameStart(unsigned int width, unsigned int height, BOOL builtin,
+                 uint32_t vendor, uint32_t model, uint32_t serial) {
+    return startImpl(width, height, builtin, vendor, model, serial, NO);
+}
+
+BOOL MitameSwitch(unsigned int width, unsigned int height, BOOL builtin,
+                  uint32_t vendor, uint32_t model, uint32_t serial) {
+    NSLog(@"switching target (builtin=%d vendor=%u)", builtin, vendor);
+    return startImpl(width, height, builtin, vendor, model, serial, YES);
 }
 
 void MitameStop(void) {

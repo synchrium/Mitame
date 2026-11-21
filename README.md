@@ -24,6 +24,7 @@ It can also give your MacBook's built-in display more room than the macOS settin
 - **More room on your MacBook, too** <sup>v0.2</sup> — use the built-in display with more space than macOS's **More Space** setting (five sizes from 1800 × 1125 to 2560 × 1600 on a 13-inch MacBook Air)
 - **Choose how big things look** — for external monitors, seven sizes based on the monitor's own resolution and shape (16:9, 16:10, 21:9, …)
 - **Keeps your main display** <sup>v0.2</sup> — if you use the built-in display as the main display and the monitor as an extended one, Mitame keeps that arrangement
+- **Stands in when your display is away** <sup>v0.3</sup> — if you chose the built-in display and close the lid, the external monitor becomes HiDPI instead; if you chose the monitor and unplug it, the built-in display does. When your chosen display comes back, Mitame switches back to it
 - **Comes back by itself** — after sleep, restarting your Mac, or unplugging and plugging in the cable
 - **No flicker** — Mitame leaves the screen alone while the Mac sleeps and lets macOS restore it, and sets the external monitor to a flicker-free mode before mirroring
 - **Open at Login**
@@ -117,7 +118,7 @@ Click the monitor icon in the menu bar.
 | **Open at Login** | Starts Mitame when you log in. If HiDPI was on, it turns on again |
 
 Mitame remembers your choices. If you unplug the monitor while HiDPI is on, Mitame waits and turns it back on when you plug it in.
-If you chose the built-in display and close the lid, it comes back when you open it.
+While your chosen display is away (the monitor is unplugged or the lid is closed), Mitame makes another display HiDPI instead (an external monitor first). The top of the menu says "instead of …". When your chosen display comes back, Mitame switches back to it.
 
 ## If something goes wrong
 

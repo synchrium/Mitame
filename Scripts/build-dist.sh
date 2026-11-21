@@ -17,8 +17,9 @@ DERIVED=$ROOT/DerivedData/Mitame-dist
 DIST=$ROOT/dist
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister
 
-rm -rf "$DIST"
+# 前に作った .app と zip だけを消す。dist に置いたほかのもの（スクショなど）は消さない
 mkdir -p "$DIST"
+rm -rf "$DIST/Mitame.app" "$DIST"/Mitame-*.zip(N)
 
 # アドホック署名でビルドする。
 # ENABLE_CODE_COVERAGE=NO：テストのカバレッジの仕込みを入れない（入れるとソースの場所 /Users/… が実行ファイルに残る）

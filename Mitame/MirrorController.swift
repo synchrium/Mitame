@@ -109,8 +109,14 @@ final class MirrorController {
     /// オンで、いまモニターがつながってミラーしている
     private(set) var isMirroring = false
     private(set) var displays: [ExternalDisplay] = []
-    /// 選んでいるモニター（つながっていなければ nil）
+    /// HiDPI にする画面。ふつうは選んだ画面で、それが無いあいだ（抜いた・ふたを閉じた）は代わりの画面。
+    /// どちらも無ければ nil
     private(set) var display: ExternalDisplay?
+    /// 選んだ画面が無いので、display を代わりに HiDPI にしている（v0.3）
+    private(set) var isStandIn = false
+    /// いま HiDPI を頼んでいる画面の id。画面がつながった・外れたときに、切り替えが要るかを見る
+    private var engineTarget: String?
+    private var switchPending = false
     private(set) var size: LookSize?
     private(set) var launchAtLogin = false
 
@@ -119,6 +125,7 @@ final class MirrorController {
     private init() {
         MitameSetChangeHandler { [weak self] in
             self?.refresh()
+            self?.switchIfNeeded()
         }
         refresh()
     }
@@ -136,6 +143,9 @@ final class MirrorController {
             return String(localized: "外部モニターが見つかりません")
         }
         let name = name(of: display)
+        if isStandIn, isOn, isMirroring, let size {
+            return String(localized: "\(name)：\(size.label)（\(chosenName)の代わり）")
+        }
         if display.isAlreadyHiDPI && !isOn {
             return String(localized: "\(name)：もとから HiDPI です")
         }
@@ -146,6 +156,13 @@ final class MirrorController {
 
     var canTurnOn: Bool {
         isOn || (display != nil && display?.isAlreadyHiDPI == false)
+    }
+
+    /// 選んだ画面の名前（つながっていなくても、覚えている名前）
+    private var chosenName: String {
+        guard let saved = defaults.string(forKey: "display") else { return String(localized: "外部モニター") }
+        if saved == ExternalDisplay.builtinID { return String(localized: "内蔵ディスプレイ") }
+        return defaults.string(forKey: "name.\(saved)") ?? String(localized: "外部モニター")
     }
 
     func name(of display: ExternalDisplay) -> String {
@@ -166,7 +183,7 @@ final class MirrorController {
 
     func setOn(_ on: Bool) {
         defaults.set(on, forKey: "enabled")
-        if on { start() } else { MitameStop() }
+        if on { start() } else { MitameStop(); engineTarget = nil }
         refresh()
     }
 
@@ -204,13 +221,36 @@ final class MirrorController {
 
     // MARK: - 中身
 
-    private func start() {
+    /// 選んだ画面が出てきた・無くなったなどで、HiDPI にする画面が変わったら切り替える。
+    /// つながった直後は macOS の並べ直しが続くので、少し待ってから見直す
+    private func switchIfNeeded() {
+        guard isOn, !switchPending, engineTarget != nil, wantedTarget != engineTarget else { return }
+        switchPending = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            guard let self else { return }
+            switchPending = false
+            refresh()
+            guard isOn, wantedTarget != engineTarget else { return }
+            NSLog("switch HiDPI target: \(engineTarget ?? "-") -> \(wantedTarget ?? "-")")
+            start(switching: true)
+        }
+    }
+
+    /// いま HiDPI にしたい画面の id（無ければ、選んだ画面が戻るのを待つのでその id）
+    private var wantedTarget: String? {
+        display?.id ?? defaults.string(forKey: "display")
+    }
+
+    private func start(switching: Bool = false) {
         refresh()
+        let begin = switching ? MitameSwitch : MitameStart
         if let display, let size {
             // オフのときに代わりに選んでいた画面でオンにしたら、それを覚える
-            defaults.set(display.id, forKey: "display")
-            MitameStart(size.width, size.height, display.isBuiltin,
-                        display.vendor, display.model, display.serial)
+            // （オンのまま代わりに使っているときは、選んだ画面のほうを覚えたままにする）
+            if !isStandIn { defaults.set(display.id, forKey: "display") }
+            engineTarget = display.id
+            _ = begin(size.width, size.height, display.isBuiltin,
+                      display.vendor, display.model, display.serial)
             return
         }
         // 抜いているときは、前回のモニターがつながるのを待つ
@@ -222,12 +262,14 @@ final class MirrorController {
         }
         // 内蔵を選んでいてふたを閉じているときは、開くのを待つ
         if saved == ExternalDisplay.builtinID {
-            MitameStart(savedSize.width, savedSize.height, true, 0, 0, 0)
+            engineTarget = saved
+            _ = begin(savedSize.width, savedSize.height, true, 0, 0, 0)
             return
         }
         let parts = saved.split(separator: "-").compactMap { UInt32($0) }
         guard parts.count == 3 else { return }
-        MitameStart(savedSize.width, savedSize.height, false, parts[0], parts[1], parts[2])
+        engineTarget = saved
+        _ = begin(savedSize.width, savedSize.height, false, parts[0], parts[1], parts[2])
     }
 
     private func refresh() {
@@ -245,13 +287,17 @@ final class MirrorController {
         }
 
         // 選んでいた画面があればそれ。
-        // なければ、オンのときはその画面が戻るのを待ち（nil）、オフのときは外部モニター、次に内蔵
+        // なければ、オンのときはほかの画面を代わりに HiDPI にし（外部モニターが先。無ければその画面が戻るのを待つ）、
+        // オフのときは外部モニター、次に内蔵
         let saved = defaults.string(forKey: "display")
+        isStandIn = false
         if let found = displays.first(where: { $0.id == saved }) {
             display = found
         } else if (isOn || defaults.bool(forKey: "enabled")) && saved != nil {
             // 起動した直後はまだ isOn が false なので、保存した「オン」も見る
-            display = nil
+            let candidates = displays.filter { !$0.isAlreadyHiDPI }
+            display = candidates.first { !$0.isBuiltin } ?? candidates.first
+            isStandIn = display != nil
         } else {
             display = displays.first { !$0.isBuiltin } ?? displays.first
         }

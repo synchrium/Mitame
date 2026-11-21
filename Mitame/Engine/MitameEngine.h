@@ -21,6 +21,11 @@ NS_ASSUME_NONNULL_BEGIN
 BOOL MitameStart(unsigned int width, unsigned int height, BOOL builtin,
                  uint32_t vendor, uint32_t model, uint32_t serial);
 
+/// MitameStart と同じだが、選んだ画面が無いときの自動の切り替え用。
+/// どの画面をメインにするかは、今の並びではなく、その画面について前に覚えたものを使う。
+BOOL MitameSwitch(unsigned int width, unsigned int height, BOOL builtin,
+                  uint32_t vendor, uint32_t model, uint32_t serial);
+
 /// ミラーを外して仮想ディスプレイを消す。モニターは元の解像度に戻る。
 void MitameStop(void);
 
